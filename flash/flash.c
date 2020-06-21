@@ -13,9 +13,6 @@
 
 #include "flash.h"
 
-#include <rthw.h>
-#include <rtthread.h>
-#include <rtdevice.h>
 
 /**
  * read half word from flash
@@ -27,7 +24,6 @@
  * @return   -1 : Illegal address
  *            n : readed size
  */
-
 static int flash_read_halfword(volatile unsigned short *addr, unsigned short *buf, int size)
 {
     if (size <= 0)
