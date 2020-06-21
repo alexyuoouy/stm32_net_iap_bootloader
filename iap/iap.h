@@ -1,6 +1,6 @@
 /*
  * HTTP Download file
- * 
+ *
  * Change Logs:
  * Date			Author		Notes
  * 2020.5.24	yuoouy		the first version
@@ -16,6 +16,6 @@ extern struct HTTPClient httpclient;
 
 typedef void (* App_Reset)( void );
 
-int download_to_flash( char *url, char *file_and_name);
+int download_to_flash( char *url);
 void MSR_MSP(unsigned int addr);
 #endif

@@ -1,6 +1,6 @@
 /*
  * HTTP Download file
- * 
+ *
  * Change Logs:
  * Date			Author		Notes
  * 2020.5.24	yuoouy		the first version
@@ -20,14 +20,14 @@
 
 
 /**
- * 
+ *
  *
  * @param url 				the input server URL address
  * 		  app_flash_base	application start address
  *
- * @return   
+ * @return
  */
-int http_download( char *url, char *file_and_name)
+int download_to_flash( char *url )
 {
     if (url == NULL)
     {
@@ -63,13 +63,13 @@ int http_download( char *url, char *file_and_name)
             return -1;
         }
         http_print_resp_header2();
-        
+
         if (flash_open((unsigned short *)APP_FLASH_BASE, httpclient.resp_header.content_length, Write) != 0)
         {
             DBG_LOG("flash open error!\n");
             return -1;
         }
-        
+
         DBG_LOG("file size : %d MB\n", (int)((float)httpclient.resp_header.content_length / 1048576));
         long recive = 0;
         int length = 0;
@@ -113,7 +113,7 @@ int http_download( char *url, char *file_and_name)
             DBG_LOG("total length is :%d\n", httpclient.resp_header.content_length);
             DBG_LOG("download %d\%...\n\n", (int)((float)recive / (float )(httpclient.resp_header.content_length) * 100));
         }
-        
+
 		DBG_LOG("download successed!\n");
         //close(fd);
         flash_close();
@@ -123,8 +123,25 @@ int http_download( char *url, char *file_and_name)
 }
 
 
-__ASM void MSR_MSP(unsigned int addr) 
+__ASM void MSR_MSP(unsigned int addr)
 {
     MSR MSP, r0 			//set Main Stack value
     BX r14
+}
+
+int upgrade_and_jump(void)
+{
+    if (download_to_flash("http://...") == -1)
+    {
+        DBG_LOG("download error!\n");
+        return -1;
+    }
+    if(((*(volatile unsigned int *)APP_FLASH_BASE)&0x2FFE0000)==0x20000000)
+	{
+        App_Reset app_reset;
+		app_reset=(App_Reset)*(volatile uint32_t *)(APP_FLASH_BASE + 4);
+		MSR_MSP(*(volatile unsigned int*)APP_FLASH_BASE);
+        DBG_LOG("jump!\n");
+		app_reset();
+    }
 }
