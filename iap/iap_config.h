@@ -2,8 +2,8 @@
  * iap config
  * 
  * Change Logs:
- * Date			Author		Notes
- * 2020.6.21	yuoouy		the first version
+ * Date	        Author      Notes
+ * 2020.6.21	yuoouy      the first version
  *
  *
  *
