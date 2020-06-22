@@ -40,7 +40,7 @@
 /*parameter.json example
 
 {
-    "size":"23432 Bytes"
+    "size":"23432 Bytes",
     "MD5":"9b4765e4b5f337e425721a1a845d1ef7"
 }
 
