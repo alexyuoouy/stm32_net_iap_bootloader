@@ -1,6 +1,6 @@
 /*
  * iap config
- * 
+ *
  * Change Logs:
  * Date	        Author      Notes
  * 2020.6.21	yuoouy      the first version
@@ -17,5 +17,46 @@
 #else
     #define DBG_LOG(...)
 #endif
+
+/*
+ *  如果使用stm32大容量产品，下列地址必须2K字节（flash单页大小）对齐，其余产品参照产品手册
+ *  num    name              size        start address
+ *  1      bootloader        256KB       0x08000000
+ *  2      application       248KB       0x08040000
+ *  3      parameter         248KB       0x0807E000
+ *
+ */
+#define     APP_FLASH_SIZE              248 * 1024
+#define     APP_FLASH_BASE              0x08040000U             /* application start address */
+#define     PARAMETER_FLASH_SIZE        8 * 1024
+#define     PARAMETER_FLASH_BASE        0x0807E000U             /* parameter start address */
+
+#define     APP_DOWNLOAD_URL            "http://.../app.bin"
+#define     PARA_DOWNLOAD_URL           "http://.../parameter.json"
+
+
+
+
+/*parameter.json example
+
+{
+    "size":"23432 Bytes"
+    "MD5":"9b4765e4b5f337e425721a1a845d1ef7"
+}
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #endif

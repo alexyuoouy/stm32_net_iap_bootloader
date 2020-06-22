@@ -8,33 +8,40 @@
  *
  *
 */
-
-#include <httpclient.h>
 #include <iap.h>
 #include <stdlib.h>
 #include <posix.h>
 #include "flash.h"
 #include "stm32f1xx.h"
 #include "string.h"
-
+#include "iap_config.h"
+#include <httpclient.h>
 
 
 /**
- *
+ * download remote file to flash
  *
  * @param url               the input server URL address
- *        app_flash_base    application start address
+ *        address           flash address
+ *        size              no less than file size
  *
- * @return
+ * @return  -1 :    error
+ *          >=0:    downloaded file size
  */
-int download_to_flash( char *url )
+int download_to_flash( char *url, uint32_t address, int size)
 {
-    if (flash_open((unsigned short *)APP_FLASH_BASE, 10240, Write) != 0)
+    if (address % 2048 != 0)
+    {
+        DBG_LOG("download address must be 2K alined!\n");
+        return -1;
+    }
+
+    if (flash_open((unsigned short *)address, size, Write) != 0)
     {
         DBG_LOG("flash open error!\n");
         return -1;
     }
-    
+
     if (url == NULL)
     {
         DBG_LOG("please input a url!\n");
@@ -68,9 +75,6 @@ int download_to_flash( char *url )
             http_close();
             return -1;
         }
-        http_print_resp_header2();
-
-        
 
         DBG_LOG("file size : %d MB\n", (int)((float)httpclient.resp_header.content_length / 1048576));
         long recive = 0;
@@ -131,17 +135,30 @@ __ASM void MSR_MSP(unsigned int addr)
     BX r14
 }
 
-int upgrade_and_jump(void)
+int upgrade(void)
 {
-    if (download_to_flash("http://...") == -1)
+    /* download parameter file*/
+    if (download_to_flash(PARA_DOWNLOAD_URL, PARAMETER_FLASH_BASE, PARAMETER_FLASH_SIZE) == -1)
     {
         DBG_LOG("download error!\n");
         return -1;
     }
+    int app_bin_size = 0;
+
+    /*add json parser function*/
+
+    /* download application bin file */
+    if (download_to_flash(APP_DOWNLOAD_URL, APP_FLASH_BASE, app_bin_size) == -1)
+    {
+        DBG_LOG("download error!\n");
+        return -1;
+    }
+
+    /* run application */
     if(((*(volatile unsigned int *)APP_FLASH_BASE)&0x2FFE0000)==0x20000000)
     {
         App_Reset app_reset;
-        app_reset=(App_Reset)*(volatile uint32_t *)(APP_FLASH_BASE + 4);
+        app_reset=(App_Reset)*(volatile uint32_t *)(APP_FLASH_BASE + 4);        /* get application RESET handler */
         MSR_MSP(*(volatile unsigned int*)APP_FLASH_BASE);
         DBG_LOG("jump!\n");
         app_reset();

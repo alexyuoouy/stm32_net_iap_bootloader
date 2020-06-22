@@ -12,10 +12,10 @@
 #define __HTTPDOWNLOAD__
 
 extern struct HTTPClient httpclient;
-#define APP_FLASH_BASE      0x08040000U             /* application start address */
+
 
 typedef void (* App_Reset)( void );
 
-int download_to_flash( char *url);
+int download_to_flash( char *url, uint32_t address, int size);
 void MSR_MSP(unsigned int addr);
 #endif
