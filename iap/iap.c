@@ -29,6 +29,12 @@
  */
 int download_to_flash( char *url )
 {
+    if (flash_open((unsigned short *)APP_FLASH_BASE, 10240, Write) != 0)
+    {
+        DBG_LOG("flash open error!\n");
+        return -1;
+    }
+    
     if (url == NULL)
     {
         DBG_LOG("please input a url!\n");
@@ -64,11 +70,7 @@ int download_to_flash( char *url )
         }
         http_print_resp_header2();
 
-        if (flash_open((unsigned short *)APP_FLASH_BASE, httpclient.resp_header.content_length, Write) != 0)
-        {
-            DBG_LOG("flash open error!\n");
-            return -1;
-        }
+        
 
         DBG_LOG("file size : %d MB\n", (int)((float)httpclient.resp_header.content_length / 1048576));
         long recive = 0;
