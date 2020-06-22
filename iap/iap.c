@@ -2,8 +2,8 @@
  * HTTP Download file
  *
  * Change Logs:
- * Date			Author		Notes
- * 2020.5.24	yuoouy		the first version
+ * Date	        Author      Notes
+ * 2020.5.24	yuoouy      the first version
  *
  *
  *
@@ -22,8 +22,8 @@
 /**
  *
  *
- * @param url 				the input server URL address
- * 		  app_flash_base	application start address
+ * @param url               the input server URL address
+ *        app_flash_base    application start address
  *
  * @return
  */
@@ -114,7 +114,7 @@ int download_to_flash( char *url )
             DBG_LOG("download %d\%...\n\n", (int)((float)recive / (float )(httpclient.resp_header.content_length) * 100));
         }
 
-		DBG_LOG("download successed!\n");
+        DBG_LOG("download successed!\n");
         //close(fd);
         flash_close();
         http_close();
@@ -125,7 +125,7 @@ int download_to_flash( char *url )
 
 __ASM void MSR_MSP(unsigned int addr)
 {
-    MSR MSP, r0 			//set Main Stack value
+    MSR MSP, r0         /* set Main Stack value */
     BX r14
 }
 
