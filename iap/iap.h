@@ -2,8 +2,8 @@
  * HTTP Download file
  *
  * Change Logs:
- * Date			Author		Notes
- * 2020.5.24	yuoouy		the first version
+ * Date	        Author      Notes
+ * 2020.5.24	yuoouy      the first version
  *
  *
  *
