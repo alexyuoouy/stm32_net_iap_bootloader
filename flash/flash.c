@@ -4,8 +4,8 @@
  * Use HAL Library
  *
  * Change Logs:
- * Date			Author		Notes
- * 2020.6.14	yuoouy		the first version
+ * Date	        Author      Notes
+ * 2020.6.14	yuoouy      the first version
  *
  *
  *
@@ -132,17 +132,17 @@ static struct Flash_fd flash_fd = {NULL, NULL, NULL, 0};
  */
 int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type flag )
 {
-	if ((uint32_t)start_addr % 2 == 1)
-	{
-		DBG_LOG("start address must be 2 bytes alined!\n");
-		return -1;
-	}
+    if ((uint32_t)start_addr % 2 == 1)
+    {
+        DBG_LOG("start address must be 2 bytes alined!\n");
+        return -1;
+    }
 //  flash_get_fd();
-//	if(flash_fd.lock == 1)
-//	{
-//		DBG_LOG("flash is locked, please close flash!\n");
-//		return -1;
-//	}
+//  if(flash_fd.lock == 1)
+//  {
+//      DBG_LOG("flash is locked, please close flash!\n");
+//      return -1;
+//  }
 	
     //flash_fd.lock = 1;
     //flash_fd.num = 0;
