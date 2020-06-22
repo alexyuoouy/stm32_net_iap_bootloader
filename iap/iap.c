@@ -137,11 +137,11 @@ int upgrade_and_jump(void)
         return -1;
     }
     if(((*(volatile unsigned int *)APP_FLASH_BASE)&0x2FFE0000)==0x20000000)
-	{
+    {
         App_Reset app_reset;
-		app_reset=(App_Reset)*(volatile uint32_t *)(APP_FLASH_BASE + 4);
-		MSR_MSP(*(volatile unsigned int*)APP_FLASH_BASE);
+        app_reset=(App_Reset)*(volatile uint32_t *)(APP_FLASH_BASE + 4);
+        MSR_MSP(*(volatile unsigned int*)APP_FLASH_BASE);
         DBG_LOG("jump!\n");
-		app_reset();
+        app_reset();
     }
 }
