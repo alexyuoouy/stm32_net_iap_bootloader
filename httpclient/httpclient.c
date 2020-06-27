@@ -516,3 +516,15 @@ int httpclient_init(void)
 
 	return 0;
 }
+
+/**
+ * get httpclient pointer
+ *
+ * @param none
+ *
+ * @return   struct HTTPClient pointer
+ */
+struct HTTPClient *get_httpclient(void)
+{
+    return &httpclient;
+}

@@ -11,25 +11,19 @@
 #ifndef __IAP__
 #define __IAP__
 
+#define IAP_PARA_ITEM_NUM  6
+
 struct iap_parameter
 {
-    char            *url;                   /* bin file url */
+    char            url[64];                   /* bin file url */
     int             size;                   /* bin file size */
-    char            *MD5;                   /* MD5 verify */
+    char            MD5[33];                   /* MD5 verify */
     uint32_t        app_flash_base;         /* application flash start address */
     int             app_flash_size;         /* application flash size */
+    char            version[10];               /* application version */
 };
 
-enum
-{
-    URL             =  0,
-    SIZE                ,
-    MD5                 ,
-    APP_FLASH_BASE      ,
-    APP_SIZE            ,
 
-    NUM                     /*这是一个计数项，用来表示enum有多少个*/
-};
 
 struct parameter_item
 {
@@ -44,5 +38,6 @@ typedef void (* App_Reset)( void );
 static int download_to_flash( char *url, uint32_t address, int size);
 static void MSR_MSP(unsigned int addr);
 static void interrupt_disable(void);
+static int parameter_parser(uint32_t para_addr);
 int upgrade(void);
 #endif

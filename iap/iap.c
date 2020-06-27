@@ -8,24 +8,24 @@
  *
  *
 */
-#include <iap.h>
+#include "iap.h"
 #include <stdlib.h>
-#include <posix.h>
 #include "flash.h"
-#include "stm32f1xx.h"
-#include "string.h"
+#include <stm32f1xx.h>
+#include <string.h>
 #include "iap_config.h"
-#include <httpclient.h>
+#include "httpclient.h"
 
 static struct HTTPClient * httpclient_t;
 static struct iap_parameter iap_para;
 
-static struct parameter_item para_item[NUM] = {
+static struct parameter_item para_item[IAP_PARA_ITEM_NUM] = {
     {"Url:", "%s", &iap_para.url},
     {"Size:", "%ld", &iap_para.size},
     {"Md5:", "%s", &iap_para.MD5},
     {"App-Flash-Base:", "%d", &iap_para.app_flash_base},
-    {"App-Flash-Size:", "%d", &iap_para.app_flash_size}
+    {"App-Flash-Size:", "%d", &iap_para.app_flash_size},
+    {"Version:", "%s", &iap_para.version}
 };
 
 /**
@@ -222,14 +222,6 @@ static int parameter_parser(uint32_t para_addr)
         flash_close();
         return -1;
     }
-    if ( flash_read(temp, PARAMETER_FLASH_SIZE) <= 0 )
-    {
-        DBG_LOG("parameter_parser read failed!\n");
-
-        flash_close();
-        free(temp);
-        return -1;
-    }
 
     int i, flag = 0;
     char ch;
@@ -272,13 +264,25 @@ static int parameter_parser(uint32_t para_addr)
     }
 
     ptr = temp;
-    for (i = 0; i < NUM; i++)
+    char format[8] = "%*s ";
+    for (i = 0; i < IAP_PARA_ITEM_NUM; i++)
     {
         ptr = strstr(temp, para_item[i].name);
-        if (ptr) { sscanf(ptr, "%*s ##para_item[i].type##", para_item[i].struct_item_addr);}
+        if (ptr)
+        {
+            strcat(format, para_item[i].type);
+            if (sscanf(ptr, format, para_item[i].struct_item_addr);rt_kprintf(format2, i, para_item[i].struct_item_addr) == -1)
+            {
+                DBG_LOG("sscanf parameter error!\n");
+                flash_close();
+                free(temp);
+                return -1;
+            }
+            format[4] = '\0';
+        }
         else
         {
-            DBG_LOG("response parameter error!\n");
+            DBG_LOG("strstr parameter error!\n");
             flash_close();
             free(temp);
             return -1;

@@ -1,8 +1,8 @@
 /*
  * On chip flash program
- * 
+ *
  * Use HAL library
- * 
+ *
  * Change Logs:
  * Date			Author		Notes
  * 2020.6.14	yuoouy		the first version
@@ -33,9 +33,10 @@ struct Flash_fd
     //int num;                                    /*flash magic number*/
     //Flash_Type type;                            /*flash type*/
     //int lock;									/*flash lock*/
-    
+
 	volatile unsigned short *start_addr;		/*start address*/
 	uint32_t cur_read_ptr;		                /*current read pointer*/
+    int read_size;                              /* read size */
 	uint32_t cur_write_ptr;		                /*current write pointer*/
     unsigned short temp;                        /*temporary storage*/
     int temp_flag;                             /*flag is record temp status*/

@@ -162,6 +162,10 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
             return -1;
         }
     }
+    else
+    {
+        flash_fd.read_size = size;
+    }
 
 	return 0;
 }
@@ -178,6 +182,15 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
  */
 int flash_read(char *buf, int length)
 {
+    if ((uint32_t)flash_fd.cur_read_ptr + length > (uint32_t)flash_fd.start_addr + flash_fd.read_size)
+    {
+        length = (uint32_t)flash_fd.start_addr + flash_fd.read_size - (uint32_t)flash_fd.cur_read_ptr;
+    }
+    else if((uint32_t)flash_fd.cur_read_ptr == (uint32_t)flash_fd.start_addr + flash_fd.read_size)
+    {
+        return 0;
+    }
+
 	int i;
 	if ((uint32_t)flash_fd.cur_read_ptr % 2 == 1)
 	{
