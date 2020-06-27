@@ -11,6 +11,8 @@
 #ifndef __IAP__
 #define __IAP__
 
+#include "stm32f1xx.h"
+
 #define IAP_PARA_ITEM_NUM  6
 
 struct iap_parameter
@@ -39,5 +41,6 @@ static int download_to_flash( char *url, uint32_t address, int size);
 static void MSR_MSP(unsigned int addr);
 static void interrupt_disable(void);
 static int parameter_parser(uint32_t para_addr);
+int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_out);                                                                                     
 int upgrade(void);
 #endif

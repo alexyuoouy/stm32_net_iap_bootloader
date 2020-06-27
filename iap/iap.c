@@ -15,6 +15,7 @@
 #include <string.h>
 #include "iap_config.h"
 #include "httpclient.h"
+#include "md5.h"                
 
 static struct HTTPClient * httpclient_t;
 static struct iap_parameter iap_para;
@@ -91,7 +92,7 @@ static int download_to_flash( char *url, uint32_t address, int size)
             return -1;
         }
 
-        DBG_LOG("file size : %d MB\n", (int)((float)httpclient_t->resp_header.content_length / 1048576));
+        DBG_LOG("file size : %d KB\n", (int)((float)httpclient_t->resp_header.content_length / 1024));
         long recive = 0;
         int length = 0;
         int count = 0;
@@ -182,6 +183,16 @@ int upgrade(void)
         return -1;
     }
 
+    /*md5 verify*/
+    char s[33];
+    generate_bin_md5(iap_para.app_flash_base, &iap_para, s);
+    s[32] = '\0';
+    DBG_LOG("md5: %s\n", s);
+    if (strcmp(s, iap_para.MD5) != 0)
+    {
+        DBG_LOG("md5 verify failed!\n", s);
+        return -1;
+    }             
     /* run application */
     if(((*(volatile unsigned int *)iap_para.app_flash_base)&0x2FFE0000) == 0x20000000)
     {
@@ -204,12 +215,12 @@ int upgrade(void)
  */
 static int parameter_parser(uint32_t para_addr)
 {
-    if (para_addr % 2048 != 0 || iap_para_t == NULL)
+    if (para_addr % 2048 != 0 )
     {
         DBG_LOG("download address must be 2K alined! And the iap para cannot be empty!\n");
         return -1;
     }
-    if (flash_open( (volatile unsigned short)para_addr, PARAMETER_FLASH_SIZE , Read ) != 0)
+    if (flash_open( (volatile unsigned short *)para_addr, PARAMETER_FLASH_SIZE , Read ) != 0)
     {
         DBG_LOG("flash open failed!\n");
         return -1;
@@ -224,7 +235,7 @@ static int parameter_parser(uint32_t para_addr)
     }
 
     int i, flag = 0;
-    char ch;
+    unsigned char ch;
     char *ptr = temp;
     for (i = 0; i < PARAMETER_FLASH_SIZE; i++)
     {
@@ -255,6 +266,7 @@ static int parameter_parser(uint32_t para_addr)
            {
                if (ch == '\n')
                {
+                   *ptr = '\0';            
                    break;
                }
                else if (ch == '\r') flag = 1;
@@ -271,13 +283,7 @@ static int parameter_parser(uint32_t para_addr)
         if (ptr)
         {
             strcat(format, para_item[i].type);
-            if (sscanf(ptr, format, para_item[i].struct_item_addr);rt_kprintf(format2, i, para_item[i].struct_item_addr) == -1)
-            {
-                DBG_LOG("sscanf parameter error!\n");
-                flash_close();
-                free(temp);
-                return -1;
-            }
+            sscanf(ptr, format, para_item[i].struct_item_addr);                                                  
             format[4] = '\0';
         }
         else
@@ -288,7 +294,7 @@ static int parameter_parser(uint32_t para_addr)
             return -1;
         }
     }
-    if ( i == NUM )
+    if ( i == IAP_PARA_ITEM_NUM )
     {
         flash_close();
         free(temp);
@@ -301,3 +307,49 @@ static int parameter_parser(uint32_t para_addr)
         return -1;
     }
 }
+
+int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_out)
+{
+    if (addr % 2048 != 0 )
+    {
+        DBG_LOG("address must be 2K alined!\n");
+        return -1;
+    }
+    if (flash_open( (volatile unsigned short *)addr, iap_para_t->size , Read ) != 0)
+    {
+        DBG_LOG("flash open failed!\n");
+        return -1;
+    }
+    int length = 0;
+    int count_length = 0;
+    unsigned char buf[512];
+    MD5_CTX md5;
+	MD5Init(&md5); 
+    unsigned char temp[16];
+    while (count_length < iap_para_t->size)
+    {
+        length = flash_read(buf, 512);
+        MD5Update(&md5, buf, length);
+        count_length += length;
+    }
+    if (count_length == iap_para_t->size)
+    {
+        DBG_LOG("read success%d\n", count_length);
+        MD5Final(&md5, temp); 
+        int i;
+        for (i = 0; i < 16; i++)
+        {
+            sprintf(md5_out, "%02x", temp[i]);
+            md5_out += 2;
+        }
+        flash_close();
+        return 0;
+    }
+    else
+    {
+        DBG_LOG("flash read num error!\n");
+        flash_close();
+        return -1;
+    }
+}
+

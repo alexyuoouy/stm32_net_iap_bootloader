@@ -65,7 +65,7 @@ struct HTTPClient
 	char *ip_addr;						     /* ip address */
 	char *path;						         /* file path */
 	char *req_addr;						     /* request address */
-    char *data_buffer;                       /* receive data buffer */
+    unsigned char *data_buffer;                       /* receive data buffer */
 };
 
 struct Prefix_Struct
@@ -84,8 +84,8 @@ struct HTTPClient * get_httpclient(void);
 int http_print_resp_header(void);
 int httpclient_init(void);
 int http_connect(char *url);
-int http_read(char *buffer, int length);
-int http_write(const char *buffer, int length);
+int http_read(unsigned char *buffer, int length);
+int http_write(const unsigned char *buffer, int length);
 int http_close(void);
 int http_send_reqheader(void);
 int http_recv_respheader(void);

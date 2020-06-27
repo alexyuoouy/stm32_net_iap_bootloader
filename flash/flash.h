@@ -35,8 +35,9 @@ struct Flash_fd
     //int lock;									/*flash lock*/
 
 	volatile unsigned short *start_addr;		/*start address*/
+    int read_size;                              /* read size */                                                           
 	uint32_t cur_read_ptr;		                /*current read pointer*/
-    int read_size;                              /* read size */
+    
 	uint32_t cur_write_ptr;		                /*current write pointer*/
     unsigned short temp;                        /*temporary storage*/
     int temp_flag;                             /*flag is record temp status*/
@@ -44,8 +45,8 @@ struct Flash_fd
 
 
 int flash_open( volatile unsigned short * start_addr,int size, Open_Flash_Type flag );
-int flash_read( char *buf, int length );
-int flash_write( char *buf, int length );
+int flash_read( unsigned char *buf, int length );
+int flash_write( unsigned char *buf, int length );
 int flash_close(void );
 
 

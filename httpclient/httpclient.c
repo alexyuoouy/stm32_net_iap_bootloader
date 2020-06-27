@@ -28,18 +28,6 @@ static char recv_data_buffer[HTTPCLIENT_RECV_BUFFER_SIZE];
 static char content_type_buffer[HTTPCLIENT_CONTENT_TYPE_BUFSZ];
 
 /**
- * get http client struct pointer
- *
- * @param none
- *
- * @return   http client struct pointer
- */
-struct HTTPClient * get_httpclient(void)
-{
-    return &httpclient;
-}
-
-/**
  * connect to http server
  *
  * @param url the input server URL address
@@ -106,7 +94,7 @@ __exit:
  * @return  >0:		read data length
  *			<=0: 	read failed or http server disconnect
  */
-int http_read(char *buffer, int length)
+int http_read(unsigned char *buffer, int length)
 {
     int bytes_read = 0;
 
@@ -137,7 +125,7 @@ int http_read(char *buffer, int length)
  * @return  >0:		write data length
  *			<=0: 	write failed or http server disconnect
  */
-int http_write(const char *buffer, int length)
+int http_write(const unsigned char *buffer, int length)
 {
     int bytes_write = 0;
 
@@ -198,7 +186,7 @@ int http_recv_respheader(void)
 __again:
     {
         /* waiting response header */
-        length = http_read(buf_ptr, 1);
+        length = http_read((unsigned char *)buf_ptr, 1);
         if (length <= 0)
 		{
             DBG_LOG("Recive error, waiting...\n");
@@ -277,7 +265,7 @@ int http_send_reqheader(void)
 		}
 	}
 
-	int ret = http_write(httpclient.req_header.buffer, httpclient.req_header.length);
+	int ret = http_write((unsigned char *)httpclient.req_header.buffer, httpclient.req_header.length);
 	if (ret <= 0)
 	{
 		DBG_LOG("header send failed!\n");

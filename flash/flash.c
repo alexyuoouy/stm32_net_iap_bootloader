@@ -166,7 +166,7 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
     {
         flash_fd.read_size = size;
     }
-
+    while (FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE) != HAL_OK);
 	return 0;
 }
 
@@ -180,7 +180,7 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
  * @return   -1 : error
  *            n : read length
  */
-int flash_read(char *buf, int length)
+int flash_read(unsigned char *buf, int length)
 {
     if ((uint32_t)flash_fd.cur_read_ptr + length > (uint32_t)flash_fd.start_addr + flash_fd.read_size)
     {
@@ -262,7 +262,7 @@ int flash_read(char *buf, int length)
  * @return   -1 : error
  *            n : write length
  */
-int flash_write(char *buf, int length)
+int flash_write(unsigned char *buf, int length)
 {
 	if (length == 0)
 	{
