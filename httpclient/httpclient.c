@@ -1,6 +1,6 @@
 /*
  * HTTP Client Via Socket API
- * 
+ *
  * Change Logs:
  * Date			Author		Notes
  * 2020.5.24	yuoouy		the first version
@@ -13,8 +13,9 @@
 #include <httpclient.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "iap_config.h"
 
-struct HTTPClient httpclient;
+static struct HTTPClient httpclient;
 static struct Prefix_Struct prefix[] = {{"http://", 7} ,{"https://", 8}};
 static char url_buffer[HTTPCLIENT_URL_MAX_SIZE];
 static char host_buffer[HTTPCLIENT_HOST_SIZE];
@@ -25,6 +26,18 @@ static char respheader_buffer[HTTPCLIENT_RESPONSE_BUFSZ];
 static char reqheader_buffer[HTTPCLIENT_HEADER_SIZE];
 static char recv_data_buffer[HTTPCLIENT_RECV_BUFFER_SIZE];
 static char content_type_buffer[HTTPCLIENT_CONTENT_TYPE_BUFSZ];
+
+/**
+ * get http client struct pointer
+ *
+ * @param none
+ *
+ * @return   http client struct pointer
+ */
+struct HTTPClient * get_httpclient(void)
+{
+    return &httpclient;
+}
 
 /**
  * connect to http server
@@ -39,9 +52,9 @@ int http_connect(char *url)
 	struct addrinfo *res = NULL;
 	struct timeval timeout;
 	int sock;
-	
+
 	strcpy(httpclient.url, url);
-	
+
 	if (http_addr_parse(&res, url) == -1 || res == NULL)
 	{
 		DBG_LOG("http_addr_parse failed!\n");
@@ -64,12 +77,12 @@ int http_connect(char *url)
         /* connect failed, close socket */
         DBG_LOG("connect failed, connect socket(%d) error.", sock);
         closesocket(sock);
-		
+
         goto __exit;
     }
 
     httpclient.socket = sock;
-	
+
 	DBG_LOG("httpclient connected!\n");
 	return 0;
 
@@ -77,7 +90,7 @@ __exit:
 	{
 		if (res) freeaddrinfo(res);
 		if ( sock > 0) closesocket(sock);
-        
+
 		DBG_LOG("httpclient connect failed!\n");
 		return -1;
 	}
@@ -107,7 +120,7 @@ int http_read(char *buffer, int length)
     {
         closesocket(httpclient.socket);
         httpclient.socket = -1;
-        return -1; 
+        return -1;
     }
 	else
 	{
@@ -155,7 +168,7 @@ int http_write(const char *buffer, int length)
  */
 int http_close(void)
 {
-   
+
     if (httpclient.socket >= 0)
     {
         closesocket(httpclient.socket);
@@ -202,10 +215,10 @@ __again:
                 httpclient.resp_header.length = buf_ptr - httpclient.resp_header.buffer;
                 DBG_LOG("Recive failed! Maybe the connect is break!\n");
                 return -1;
-            }                
-			
+            }
+
 		}
-        
+
 		if (flag == 0)	{if (*buf_ptr == '\r') flag = 1;}
 		else if (flag == 1)
 		{
@@ -220,7 +233,7 @@ __again:
 		}
 		else if (flag == 3)
 		{
-			if (*buf_ptr == '\n') 
+			if (*buf_ptr == '\n')
 			{
 				*(buf_ptr + 1) = '\0';
 				goto __exit;
@@ -228,7 +241,7 @@ __again:
 			else if (*buf_ptr == '\r')flag = 1;
 			else flag = 0;
 		}
-        
+
 		buf_ptr += length;
 		if (buf_ptr - httpclient.resp_header.buffer >= HTTPCLIENT_RESPONSE_BUFSZ - 2)
 		{
@@ -238,7 +251,7 @@ __again:
 		}
         goto __again;
     }
-    
+
 __exit:
 	httpclient.resp_header.length = buf_ptr - httpclient.resp_header.buffer + 1;
     DBG_LOG("response header length is :%d\n", httpclient.resp_header.length);
@@ -263,7 +276,7 @@ int http_send_reqheader(void)
 			return -1;
 		}
 	}
-	
+
 	int ret = http_write(httpclient.req_header.buffer, httpclient.req_header.length);
 	if (ret <= 0)
 	{
@@ -296,9 +309,9 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 		DBG_LOG("url address is too long!\n");
 		return -1;
 	}
-	
-	/*²é¿´ÊÇ·ñÓÐÇ°×º*/
-	
+
+	/*ï¿½é¿´ï¿½Ç·ï¿½ï¿½ï¿½Ç°×º*/
+
 	if (strncmp(url, prefix[1].prefix, prefix[1].length) == 0)
 	{
 		DBG_LOG("not support https!");
@@ -309,15 +322,15 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 	{
 		httpclient.prefix_num = 0;
 	}
-	
-	/*·ÖÀëÖ÷»úµØÖ·¶Ë¿ÚºÍÂ·¾¶*/
+
+	/*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½Ë¿Úºï¿½Â·ï¿½ï¿½*/
 	int i;
 	for (i = prefix[httpclient.prefix_num].length; url[i] != '/' && url[i] != '\0'; i++)
 	{
 		httpclient.host[i - prefix[httpclient.prefix_num].length] = url[i];
        // DBG_LOG("url[%d] : %c\n", i, url[i]);
 	}
-	
+
 	if (url[i] == '\0')
 	{
 		DBG_LOG("url is not include path!\n");
@@ -334,8 +347,8 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 		DBG_LOG("never reach here!\n");
 	}
 	strcpy(httpclient.req_addr, httpclient.host);
-	
-	/*detach host address ºÍ port*/
+
+	/*detach host address ï¿½ï¿½ port*/
 	char *p = strchr(httpclient.host, ':');
 	if (p != NULL)
 	{
@@ -346,7 +359,7 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 	{
 		httpclient.port = 80;
 	}
-	
+
 	 /* resolve the host name. */
     struct addrinfo hint;
     int ret;
@@ -388,11 +401,11 @@ int http_respheader_parse(void)
         else { DBG_LOG("response header error!\n");
             return -1;}
         ptr = strstr(httpclient.resp_header.buffer, "Content-Length:");
-        if (ptr) { sscanf(ptr, "%*s %ld", &(httpclient.resp_header.content_length));}
+        if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.content_length));}
         else { DBG_LOG("response header error!\n");
             return -1;}
-        
-        return 0;    
+
+        return 0;
 	}
 }
 
@@ -406,11 +419,11 @@ int http_respheader_parse(void)
 *			<0: add failed or other error
  */
 int http_add_reqheader(char *header)
-{ 
+{
 	if (httpclient.req_header.length == 0)
 	{
 		int ret;
-        
+
 		ret = sprintf(httpclient.req_header.buffer, \
             "GET %s HTTP/1.1\r\n"\
             "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"\
@@ -436,7 +449,7 @@ int http_add_reqheader(char *header)
 		strcpy(httpclient.req_header.buffer + httpclient.req_header.length, header);
 		httpclient.req_header.length = strlen(httpclient.req_header.buffer) - 1;
 	}
-	
+
 	return httpclient.req_header.length;
 }
 
@@ -446,7 +459,7 @@ int http_add_reqheader(char *header)
  * @param none
  *
  * @return   0: print successed
-*          -1: print failed 
+*          -1: print failed
  */
 int http_print_resp_header(void)
 {
@@ -465,7 +478,7 @@ int http_print_resp_header(void)
  * @param none
  *
  * @return   0: print successed
-*          -1: print failed 
+*          -1: print failed
  */
 int http_print_resp_header2(void)
 {
@@ -500,9 +513,6 @@ int httpclient_init(void)
 	httpclient.url = url_buffer;
 	httpclient.data_buffer = recv_data_buffer;
     httpclient.resp_header.content_type = content_type_buffer;
-    
+
 	return 0;
 }
-
-
-

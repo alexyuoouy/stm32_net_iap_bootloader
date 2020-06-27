@@ -1,6 +1,6 @@
 /*
  * flash read and program
- * 
+ *
  * Use HAL Library
  *
  * Change Logs:
@@ -12,6 +12,7 @@
 */
 
 #include "flash.h"
+#include "iap_config.h"
 
 
 /**
@@ -62,13 +63,13 @@ static int flash_erase_page(volatile unsigned short *addr, int size)
     uint32_t Page_err;
     int ret;
     ret = HAL_FLASHEx_Erase(&FLASH_EraseInitStruct, &Page_err);
-    
+
     if (ret != 0)
     {
         DBG_LOG("flash write error!\n");
         return -ret;
     }
-    
+
     return 0;
 }
 /**
@@ -94,21 +95,21 @@ static int flash_write_halfword(volatile unsigned short *addr, unsigned short *b
         DBG_LOG("flash write Illegal address!: %08x\n", addr);
         return -1;
     }
-    
+
     uint32_t i, address;
     address = (uint32_t)addr;
     HAL_StatusTypeDef status;
     for(i = 0; i < size; i++)
     {
-        
+
         status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, (uint32_t)address, buf[i]);
-        
+
         if (status != HAL_OK)
         {
             DBG_LOG("flash program error in:%08x\n", address);
             break;
         }
-        address += 2; 
+        address += 2;
     }
     return -status;
 }
@@ -123,12 +124,12 @@ static struct Flash_fd flash_fd = {NULL, NULL, NULL, 0};
  * flash set parameter and lock
  *
  * @param  start_addr   flash program start address
- *         size         the data size that need to write 
+ *         size         the data size that need to write
  *         flag         write or read
  *
  * @return   -1 : error
  *            0 : ok
- *              
+ *
  */
 int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type flag )
 {
@@ -143,10 +144,10 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
 //      DBG_LOG("flash is locked, please close flash!\n");
 //      return -1;
 //  }
-	
+
     //flash_fd.lock = 1;
     //flash_fd.num = 0;
-    
+
     flash_fd.start_addr = start_addr;
     flash_fd.cur_read_ptr = (uint32_t)start_addr;
     flash_fd.cur_write_ptr = (uint32_t)start_addr;
@@ -161,7 +162,7 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
             return -1;
         }
     }
-    
+
 	return 0;
 }
 
@@ -188,7 +189,7 @@ int flash_read(char *buf, int length)
 			DBG_LOG("flash read halfword error!\n");
 			return -1;
 		}
-		
+
 		for(i = 0; i < length; i++)
 		{
 			if (i % 2 == 0)
@@ -225,7 +226,7 @@ int flash_read(char *buf, int length)
 			}
 //            DBG_LOG("buf[%d] = %c\n", i, buf[i]);
 		}
-        
+
 //         for (i = 0; i < size; i++)
 //        {
 //            //unsigned short temp = flash_buffer[i];
@@ -234,7 +235,7 @@ int flash_read(char *buf, int length)
 //        }
 	}
 	flash_fd.cur_read_ptr += length;
-	
+
 	return i;
 }
 
@@ -255,7 +256,7 @@ int flash_write(char *buf, int length)
 		return 0;
 	}
     //DBG_LOG("flash_write will write %d bytes to address%08x...\n", length, flash_fd.cur_write_ptr);
-    
+
 	if (flash_fd.temp_flag)
     {
         //DBG_LOG("last time temp is full\n");
@@ -269,13 +270,13 @@ int flash_write(char *buf, int length)
         flash_fd.temp = 0;
         flash_fd.temp_flag = 0;
         //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", 2, flash_fd.cur_write_ptr);
-        
+
         if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_write_ptr, (unsigned short *)(buf + 1), (length - 1) / 2) == -1)
         {
             DBG_LOG("flash write error!\n");
             return -1;
         }
-        
+
         if ((length - 1) % 2 == 0)
         {
             flash_fd.cur_write_ptr += (length - 1);
@@ -291,7 +292,7 @@ int flash_write(char *buf, int length)
             //DBG_LOG("flash_write  writed %d bytes to flash, now current write pointer is %08x\n", length - 2, flash_fd.cur_write_ptr);
 
         }
-        
+
         return length;
     }
     else
@@ -301,7 +302,7 @@ int flash_write(char *buf, int length)
             DBG_LOG("flash write error!\n");
             return -1;
         }
-        
+
         if (length % 2 == 0)
         {
             flash_fd.cur_write_ptr += length;
@@ -315,7 +316,7 @@ int flash_write(char *buf, int length)
             //DBG_LOG("add data to temp\n");
             //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length - 1, flash_fd.cur_write_ptr);
         }
-        
+
         return length;
     }
 }
@@ -346,11 +347,11 @@ int flash_close(void)
         flash_fd.temp = 0;
         flash_fd.temp_flag = 0;
     }
-	
+
     HAL_FLASH_Lock();
 	flash_fd.start_addr = NULL;
 	flash_fd.cur_read_ptr = NULL;
 	flash_fd.cur_write_ptr = NULL;
-	
+
 	return 0;
 }
