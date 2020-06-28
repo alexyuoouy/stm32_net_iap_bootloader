@@ -36,3 +36,5 @@ Version: V0.0.1
 
 * ## 移植方法：
 1. 底层需要实现socket的POSIX接口，填入socket.h中
+* ## 代码引用
+* MD5的计算部分需感谢<https://blog.csdn.net/xhhjin/article/details/8450686>
