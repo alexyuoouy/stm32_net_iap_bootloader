@@ -15,7 +15,7 @@
 #include <string.h>
 #include "iap_config.h"
 #include "httpclient.h"
-#include "md5.h"                
+#include "md5.h"
 
 static struct HTTPClient * httpclient_t;
 static struct iap_parameter iap_para;
@@ -24,11 +24,10 @@ static struct parameter_item para_item[IAP_PARA_ITEM_NUM] = {
     {"Url:", "%s", &iap_para.url},
     {"Size:", "%ld", &iap_para.size},
     {"Md5:", "%s", &iap_para.MD5},
-    {"App-Flash-Base:", "%d", &iap_para.app_flash_base},
-    {"App-Flash-Size:", "%d", &iap_para.app_flash_size},
+    {"App-Flash-Base:", "0x%08x", &iap_para.app_flash_base},
+    {"App-Flash-Size:", "0x%08x", &iap_para.app_flash_size},
     {"Version:", "%s", &iap_para.version}
 };
-
 /**
  * download remote file to flash
  *
@@ -192,7 +191,7 @@ int upgrade(void)
     {
         DBG_LOG("md5 verify failed!\n", s);
         return -1;
-    }             
+    }
     /* run application */
     if(((*(volatile unsigned int *)iap_para.app_flash_base)&0x2FFE0000) == 0x20000000)
     {
@@ -266,7 +265,7 @@ static int parameter_parser(uint32_t para_addr)
            {
                if (ch == '\n')
                {
-                   *ptr = '\0';            
+                   *ptr = '\0';
                    break;
                }
                else if (ch == '\r') flag = 1;
@@ -276,14 +275,14 @@ static int parameter_parser(uint32_t para_addr)
     }
 
     ptr = temp;
-    char format[8] = "%*s ";
+    char format[11] = "%*s ";
     for (i = 0; i < IAP_PARA_ITEM_NUM; i++)
     {
         ptr = strstr(temp, para_item[i].name);
         if (ptr)
         {
             strcat(format, para_item[i].type);
-            sscanf(ptr, format, para_item[i].struct_item_addr);                                                  
+            sscanf(ptr, format, para_item[i].struct_item_addr);
             format[4] = '\0';
         }
         else
@@ -324,7 +323,7 @@ int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_
     int count_length = 0;
     unsigned char buf[512];
     MD5_CTX md5;
-	MD5Init(&md5); 
+	MD5Init(&md5);
     unsigned char temp[16];
     while (count_length < iap_para_t->size)
     {
@@ -335,7 +334,7 @@ int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_
     if (count_length == iap_para_t->size)
     {
         DBG_LOG("read success%d\n", count_length);
-        MD5Final(&md5, temp); 
+        MD5Final(&md5, temp);
         int i;
         for (i = 0; i < 16; i++)
         {
@@ -352,4 +351,3 @@ int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_
         return -1;
     }
 }
-

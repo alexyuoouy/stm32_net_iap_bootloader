@@ -24,13 +24,13 @@
 Url: http://.../app.bin
 Size: 64940
 Md5: 03d3babeec45a70b08845c13db82eb15
-App-Flash-Base: 134479872
-App-Flash-Size: 253952
+App-Flash-Base: 0x08040000
+App-Flash-Size: 0x0003f800
 Version: V0.0.1
 
 ```
 
-> 注意：文件末尾使用\r\n\r\n为结束标志。
+> 注意：冒号前的关键字不可更改，冒号后有空格，每行以\r\n结束，文件末尾使用\r\n\r\n结束。
 
 
 
