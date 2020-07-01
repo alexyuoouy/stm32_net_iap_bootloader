@@ -297,7 +297,7 @@ int upgrade(void)
         DBG_LOG("parameter parser error!\n");
         return -1;
     }
-
+	__redownload:
     /* download application bin file */
     if (download_to_flash_bpr(iap_para.url, iap_para.app_flash_base, iap_para.size) == -1)
     {
@@ -313,7 +313,7 @@ int upgrade(void)
     if (strcmp(s, iap_para.MD5) != 0)
     {
         DBG_LOG("md5 verify failed!\n", s);
-        return -1;
+        goto __redownload;
     }
     /* run application */
     if(((*(volatile unsigned int *)iap_para.app_flash_base)&0x2FFE0000) == 0x20000000)
