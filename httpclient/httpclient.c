@@ -24,8 +24,51 @@ static char path_buffer[HTTPCLIENT_PATH_SIZE];
 static char req_addr_buffer[HTTPCLIENT_REQADDR_SIZE];
 static char respheader_buffer[HTTPCLIENT_RESPONSE_BUFSZ];
 static char reqheader_buffer[HTTPCLIENT_HEADER_SIZE];
-static char recv_data_buffer[HTTPCLIENT_RECV_BUFFER_SIZE];
+static unsigned char recv_data_buffer[HTTPCLIENT_RECV_BUFFER_SIZE];
 static char content_type_buffer[HTTPCLIENT_CONTENT_TYPE_BUFSZ];
+static char reqheader_content_range_buf[HTTPCLIENT_CONTENT_RANGE_BUFSZ];
+
+static struct Resp_Status_Operation resp_operation_table[] = 
+{
+    {100, 101, NoHandle},
+    {200, 200, success200},
+    {206, 206, success206},
+    {201, 205, NoHandle},
+    {300, 505, NoHandle}
+};
+
+int NoHandle(void)
+{
+    return -1;
+}
+int success200(void)
+{
+    char *ptr = strstr(httpclient.resp_header.buffer, "Content-Type:");
+    if (ptr) { sscanf(ptr, "%*s %s", httpclient.resp_header.content_type); }
+    else { DBG_LOG("response header not include content type!\n");
+        return -1;}
+    ptr = strstr(httpclient.resp_header.buffer, "Content-Length:");
+    if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.content_length));}
+    else { DBG_LOG("response header not include content length!\n");
+        return -1;}
+    return 0;
+}
+int success206(void)
+{
+    char *ptr = strstr(httpclient.resp_header.buffer, "Content-Type:");
+    if (ptr) { sscanf(ptr, "%*s %s", httpclient.resp_header.content_type); }
+    else { DBG_LOG("response header not include content type!\n");
+        return -1;}
+    ptr = strstr(httpclient.resp_header.buffer, "Content-Length:");
+    if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.content_length));}
+    else { DBG_LOG("response header not include content length!\n");
+        return -1;}
+    ptr = strstr(httpclient.resp_header.buffer, "Content-Range:");
+    if (ptr) { sscanf(ptr, "%*s bytes %d-%d/%d", &httpclient.resp_header.content_range_start, &httpclient.resp_header.content_range_end, &httpclient.resp_header.content_overall_length);}
+    else { DBG_LOG("response header not include content range!\n");
+        return -1;}
+    return 0;
+}
 
 /**
  * connect to http server
@@ -40,47 +83,79 @@ int http_connect(char *url)
 	struct addrinfo *res = NULL;
 	struct timeval timeout;
 	int sock;
-
+    int parse_failed_count = 0;
+    int socket_failed_count = 0;
+    int connect_failed_count = 0;
+	
 	strcpy(httpclient.url, url);
-
+    
+__parser:	
 	if (http_addr_parse(&res, url) == -1 || res == NULL)
 	{
-		DBG_LOG("http_addr_parse failed!\n");
-		goto __exit;
+		DBG_LOG("http_addr_parse failed%d!\n", parse_failed_count);
+        rt_thread_delay(RT_TICK_PER_SECOND);
+        parse_failed_count++;
+        if (parse_failed_count > 10)
+        {
+            parse_failed_count = 0;
+            goto __deinit_esp8266;
+        }
+        goto __parser;
 	}
-	http_add_reqheader(NULL);
+    
+__socket:    
 	sock = socket(res->ai_family, SOCK_STREAM, IPPROTO_TCP);
+    DBG_LOG("socket socket socket\n\n");
 	if (sock < 0)
     {
-        DBG_LOG("socket(%d) create failed!\n", sock);
-        goto __exit;
+        DBG_LOG("socket(%d) create failed%d!\n", sock, socket_failed_count);
+        rt_thread_delay(RT_TICK_PER_SECOND);
+        socket_failed_count++;
+        if (socket_failed_count > 10)
+        {
+            socket_failed_count = 0;
+            goto __parser;
+        }
+        goto __socket;
     }
 
     /* set receive and send timeout option */
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *) &timeout, sizeof(timeout));
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (void *) &timeout, sizeof(timeout));
-
+    
+__connect:
     if (connect(sock, res->ai_addr, res->ai_addrlen) != 0)
     {
         /* connect failed, close socket */
-        DBG_LOG("connect failed, connect socket(%d) error.", sock);
-        closesocket(sock);
+        DBG_LOG("connect failed%d, connect socket(%d) error.", connect_failed_count,  sock);
+        rt_thread_delay(RT_TICK_PER_SECOND);
+        connect_failed_count++;
+        if (connect_failed_count > 10)
+        {
+            connect_failed_count = 0;
+            closesocket(sock);
 
-        goto __exit;
+            goto __socket;
+        }
+        goto __deinit_esp8266;
     }
 
     httpclient.socket = sock;
-
+	
 	DBG_LOG("httpclient connected!\n");
-	return 0;
+	goto __exit;
 
+__deinit_esp8266:
+    while(esp8266_net_init() != 0);
+    goto __parser;
+    
 __exit:
 	{
-		if (res) freeaddrinfo(res);
-		if ( sock > 0) closesocket(sock);
+		return 0;
+								   
 
-		DBG_LOG("httpclient connect failed!\n");
-		return -1;
+										  
+			
 	}
 }
 
@@ -192,7 +267,7 @@ __again:
             DBG_LOG("Recive error, waiting...\n");
             rt_thread_delay( RT_TICK_PER_SECOND );
             count += 1;
-            if (count < 6)
+            if (count < 3)
             {
                 goto __again;
             }
@@ -256,14 +331,7 @@ __exit:
  */
 int http_send_reqheader(void)
 {
-	if (httpclient.req_header.length <= 0)
-	{
-		if (http_add_reqheader(NULL) < 0)
-		{
-			DBG_LOG("add header failed!\n");
-			return -1;
-		}
-	}
+	
 
 	int ret = http_write((unsigned char *)httpclient.req_header.buffer, httpclient.req_header.length);
 	if (ret <= 0)
@@ -298,7 +366,7 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 		return -1;
 	}
 
-	/*�鿴�Ƿ���ǰ׺*/
+	/*查看是否有前缀*/
 
 	if (strncmp(url, prefix[1].prefix, prefix[1].length) == 0)
 	{
@@ -311,7 +379,7 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 		httpclient.prefix_num = 0;
 	}
 
-	/*����������ַ�˿ں�·��*/
+	/*分离主机地址端口和路径*/
 	int i;
 	for (i = prefix[httpclient.prefix_num].length; url[i] != '/' && url[i] != '\0'; i++)
 	{
@@ -336,7 +404,7 @@ static int http_addr_parse(struct addrinfo **res, char *url)
 	}
 	strcpy(httpclient.req_addr, httpclient.host);
 
-	/*detach host address �� port*/
+	/*detach host address and port*/
 	char *p = strchr(httpclient.host, ':');
 	if (p != NULL)
 	{
@@ -363,6 +431,26 @@ static int http_addr_parse(struct addrinfo **res, char *url)
     return 0;
 }
 
+struct Resp_Status_Operation *get_resp_status_op(void)
+{
+    //DBG_LOG("resp_operation_table size: %d,httpclient.resp_header.status: %d\n", sizeof(resp_operation_table)/sizeof(struct Resp_Status_Operation), httpclient.resp_header.status);
+    int i;
+    int size = sizeof(resp_operation_table)/sizeof(struct Resp_Status_Operation);
+    for(i = 0; i < size; i++)
+    {
+//        DBG_LOG("httpclient.resp_header.status : %d\n", httpclient.resp_header.status);
+//        DBG_LOG("resp_operation_table[i].start_status : %d\n", resp_operation_table[i].start_status);
+//        DBG_LOG("resp_operation_table[i].end_status : %d\n", resp_operation_table[i].end_status);
+        if (httpclient.resp_header.status >= resp_operation_table[i].start_status && httpclient.resp_header.status <= resp_operation_table[i].end_status)
+        {
+            return &resp_operation_table[i];
+        } 
+    }
+    if (i == size)
+    {
+        return NULL;
+    }
+}
 /**
  * response header parse
  *
@@ -373,55 +461,49 @@ static int http_addr_parse(struct addrinfo **res, char *url)
  */
 int http_respheader_parse(void)
 {
-	if (httpclient.resp_header.length <= 0)
-	{
-		DBG_LOG("response buffer is empty!\n");
-		return -1;
-	}
-	else
-	{
-		char *ptr = strstr(httpclient.resp_header.buffer, "HTTP/");
-        if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.status));}
-        else { DBG_LOG("response header error!\n");
-            return -1;}
-        ptr = strstr(httpclient.resp_header.buffer, "Content-Type:");
-        if (ptr) { sscanf(ptr, "%*s %s", httpclient.resp_header.content_type); }
-        else { DBG_LOG("response header error!\n");
-            return -1;}
-        ptr = strstr(httpclient.resp_header.buffer, "Content-Length:");
-        if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.content_length));}
-        else { DBG_LOG("response header error!\n");
-            return -1;}
-
-        return 0;
+	char *ptr = strstr(httpclient.resp_header.buffer, "HTTP/");
+    if (ptr) { sscanf(ptr, "%*s %d", &(httpclient.resp_header.status));}
+    else { DBG_LOG("response header error!\n");
+        return -1;}
+    struct Resp_Status_Operation *resp_sta_op = get_resp_status_op();
+    if (resp_sta_op == NULL)
+    {
+        DBG_LOG("http status code not support!\n");
+        return -1;
+    }
+    else
+    {
+        return resp_sta_op->func();
 	}
 }
 
 
 /**
- * add request header
+ * make a request header
  *
  * @param header The header will be added
  *
  * @return  >0: header length
 *			<0: add failed or other error
  */
-int http_add_reqheader(char *header)
-{
-	if (httpclient.req_header.length == 0)
+int http_make_reqheader(struct HTTPClient * httpcli_t)
+ 
+									   
+{ 
+    httpcli_t->req_header.length = 0;
+    int ret;
+	if (httpcli_t->req_header.break_point_resume == 0)
 	{
-		int ret;
-
-		ret = sprintf(httpclient.req_header.buffer, \
+		ret = sprintf(httpcli_t->req_header.buffer, \
             "GET %s HTTP/1.1\r\n"\
             "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"\
             "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36\r\n"\
             "Host: %s\r\n"\
             "Connection: keep-alive\r\n"\
             "\r\n"\
-        ,httpclient.path, httpclient.host);
-        DBG_LOG("request header length is: %d\n", strlen(httpclient.req_header.buffer));
-        DBG_LOG("request header is: %s\n", httpclient.req_header.buffer);
+        ,httpcli_t->path, httpcli_t->req_addr);
+        DBG_LOG("request header length is: %d\n", strlen(httpcli_t->req_header.buffer));
+        DBG_LOG("request header is: %s\n", httpcli_t->req_header.buffer);
 		if (ret < 0)
 		{
 			DBG_LOG("add header failed!\n");
@@ -429,16 +511,33 @@ int http_add_reqheader(char *header)
 		}
 		else
 		{
-			httpclient.req_header.length = ret;
+			httpcli_t->req_header.length = ret;
 		}
 	}
-	if (header != NULL)
-	{
-		strcpy(httpclient.req_header.buffer + httpclient.req_header.length, header);
-		httpclient.req_header.length = strlen(httpclient.req_header.buffer) - 1;
-	}
-
-	return httpclient.req_header.length;
+	else
+    {
+        ret = sprintf(httpcli_t->req_header.buffer, \
+            "GET %s HTTP/1.1\r\n"\
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"\
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36\r\n"\
+            "Host: %s\r\n"\
+            "Range: bytes=%s\r\n"\
+            "Connection: keep-alive\r\n"\
+            "\r\n"\
+        ,httpcli_t->path, httpcli_t->req_addr, httpcli_t->req_header.content_range);
+        DBG_LOG("request header length is: %d\n", strlen(httpcli_t->req_header.buffer));
+        DBG_LOG("request header is: %s\n", httpcli_t->req_header.buffer);
+		if (ret < 0)
+		{
+			DBG_LOG("add header failed!\n");
+			return -1;
+		}
+		else
+		{
+			httpcli_t->req_header.length = ret;
+		}
+    }
+	return httpcli_t->req_header.length;
 }
 
 /**
@@ -501,6 +600,8 @@ int httpclient_init(void)
 	httpclient.url = url_buffer;
 	httpclient.data_buffer = recv_data_buffer;
     httpclient.resp_header.content_type = content_type_buffer;
+	httpclient.req_header.break_point_resume = 0;
+    httpclient.req_header.content_range = reqheader_content_range_buf;															  
 
 	return 0;
 }

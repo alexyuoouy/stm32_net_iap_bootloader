@@ -149,12 +149,15 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
     //flash_fd.num = 0;
 
     flash_fd.start_addr = start_addr;
-    flash_fd.cur_read_ptr = (uint32_t)start_addr;
-    flash_fd.cur_write_ptr = (uint32_t)start_addr;
-    flash_fd.temp = 0;
-    flash_fd.temp_flag = 0;
-    if ( flag == Write )
+    flash_fd.cur_ptr = (uint32_t)start_addr;
+    flash_fd.RW_flag = flag;
+    
+    if ( (flag & 2) > 0 )
     {
+        flash_fd.temp = 0;
+        flash_fd.temp_flag = 0;
+        flash_fd.size = size;
+	 
         HAL_FLASH_Unlock();
         if (flash_erase_page(start_addr, size) != 0)
         {
@@ -164,7 +167,7 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
     }
     else
     {
-        flash_fd.read_size = size;
+        
     }
     while (FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE) != HAL_OK);
 	return 0;
@@ -182,28 +185,34 @@ int flash_open( volatile unsigned short * start_addr,int size ,Open_Flash_Type f
  */
 int flash_read(unsigned char *buf, int length)
 {
-    if ((uint32_t)flash_fd.cur_read_ptr + length > (uint32_t)flash_fd.start_addr + flash_fd.read_size)
+    int read_length = length;
+    if ((flash_fd.RW_flag & 1) == 0)
     {
-        length = (uint32_t)flash_fd.start_addr + flash_fd.read_size - (uint32_t)flash_fd.cur_read_ptr;
+        DBG_LOG("you can not read!\n");
+        return -1;
     }
-    else if((uint32_t)flash_fd.cur_read_ptr == (uint32_t)flash_fd.start_addr + flash_fd.read_size)
+    if ((uint32_t)flash_fd.cur_ptr + read_length > (uint32_t)flash_fd.start_addr + flash_fd.size)
+    {
+        read_length = (uint32_t)flash_fd.start_addr + flash_fd.size - (uint32_t)flash_fd.cur_ptr;
+    }
+    else if((uint32_t)flash_fd.cur_ptr == (uint32_t)flash_fd.start_addr + flash_fd.size)																
     {
         return 0;
     }
 
 	int i;
-	if ((uint32_t)flash_fd.cur_read_ptr % 2 == 1)
+	if ((uint32_t)flash_fd.cur_ptr % 2 == 1)
 	{
 		int size;
-		size = length / 2 + 1;
+		size = read_length / 2 + 1;
 		unsigned short buffer[size];
-		if(flash_read_halfword((volatile unsigned short *)(flash_fd.cur_read_ptr - 1), buffer, size) == -1)
+		if(flash_read_halfword((volatile unsigned short *)(flash_fd.cur_ptr - 1), buffer, size) == -1)
 		{
 			DBG_LOG("flash read halfword error!\n");
 			return -1;
 		}
 
-		for(i = 0; i < length; i++)
+		for(i = 0; i < read_length; i++)
 		{
 			if (i % 2 == 0)
 			{
@@ -218,16 +227,16 @@ int flash_read(unsigned char *buf, int length)
 	else
 	{
 		int size;
-		size = (length - 1) / 2 + 1;
+		size = (read_length - 1) / 2 + 1;
 		unsigned short buffer[size];
         //DBG_LOG("size = %d\n", size);
-		if(flash_read_halfword((volatile unsigned short *)flash_fd.cur_read_ptr, buffer, size) == -1)
+		if(flash_read_halfword((volatile unsigned short *)flash_fd.cur_ptr, buffer, size) == -1)
 		{
 			DBG_LOG("flash read halfword error!\n");
 			return -1;
 		}
 
-		for(i = 0; i < length; i++)
+		for(i = 0; i < read_length; i++)
 		{
 			if (i % 2 == 0)
 			{
@@ -243,11 +252,11 @@ int flash_read(unsigned char *buf, int length)
 //         for (i = 0; i < size; i++)
 //        {
 //            //unsigned short temp = flash_buffer[i];
-//            DBG_LOG("read length:%d, buf size :%d\n", length, size);
+//            DBG_LOG("read read_length:%d, buf size :%d\n", read_length, size);
 //            DBG_LOG("%d:%c %c\n", i, (char)(buffer[i]>>8), (char)(buffer[i]&0x00ff));
 //        }
 	}
-	flash_fd.cur_read_ptr += length;
+	flash_fd.cur_ptr += read_length;
 
 	return i;
 }
@@ -264,27 +273,41 @@ int flash_read(unsigned char *buf, int length)
  */
 int flash_write(unsigned char *buf, int length)
 {
+	int write_length = length;
+    if ((flash_fd.RW_flag & 2) == 0)
+    {
+        DBG_LOG("you can not write!\n");
+        return -1;
+    }
 	if (length == 0)
 	{
 		return 0;
 	}
-    //DBG_LOG("flash_write will write %d bytes to address%08x...\n", length, flash_fd.cur_write_ptr);
+	if ((uint32_t)flash_fd.cur_ptr + write_length > (uint32_t)flash_fd.start_addr + flash_fd.size)
+    {
+        write_length = (uint32_t)flash_fd.start_addr + flash_fd.size - (uint32_t)flash_fd.cur_ptr;
+    }
+    else if((uint32_t)flash_fd.cur_ptr == (uint32_t)flash_fd.start_addr + flash_fd.size)
+    {
+        return 0;
+    }
+    //DBG_LOG("flash_write will write %d bytes to address%08x...\n", length, flash_fd.cur_ptr);
 
 	if (flash_fd.temp_flag)
     {
         //DBG_LOG("last time temp is full\n");
         flash_fd.temp += buf[0] << 8;
-        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_write_ptr, &flash_fd.temp, 1) == -1)
+        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_ptr, &flash_fd.temp, 1) == -1)
 		{
 			DBG_LOG("flash write error!\n");
 			return -1;
 		}
-        flash_fd.cur_write_ptr += 2;
+        flash_fd.cur_ptr += 2;
         flash_fd.temp = 0;
         flash_fd.temp_flag = 0;
-        //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", 2, flash_fd.cur_write_ptr);
+        //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", 2, flash_fd.cur_ptr);
 
-        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_write_ptr, (unsigned short *)(buf + 1), (length - 1) / 2) == -1)
+        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_ptr, (unsigned short *)(buf + 1), (length - 1) / 2) == -1)
         {
             DBG_LOG("flash write error!\n");
             return -1;
@@ -292,17 +315,17 @@ int flash_write(unsigned char *buf, int length)
 
         if ((length - 1) % 2 == 0)
         {
-            flash_fd.cur_write_ptr += (length - 1);
-            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length - 1, flash_fd.cur_write_ptr);
+            flash_fd.cur_ptr += (length - 1);
+            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length - 1, flash_fd.cur_ptr);
 
         }
         else
         {
-            flash_fd.cur_write_ptr += (length - 2);
+            flash_fd.cur_ptr += (length - 2);
             flash_fd.temp += buf[length -1];
             flash_fd.temp_flag = 1;
             //DBG_LOG("add data to temp\n");
-            //DBG_LOG("flash_write  writed %d bytes to flash, now current write pointer is %08x\n", length - 2, flash_fd.cur_write_ptr);
+            //DBG_LOG("flash_write  writed %d bytes to flash, now current write pointer is %08x\n", length - 2, flash_fd.cur_ptr);
 
         }
 
@@ -310,7 +333,7 @@ int flash_write(unsigned char *buf, int length)
     }
     else
     {
-        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_write_ptr, (unsigned short *)buf, length / 2) == -1)
+        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_ptr, (unsigned short *)buf, length / 2) == -1)
         {
             DBG_LOG("flash write error!\n");
             return -1;
@@ -318,22 +341,65 @@ int flash_write(unsigned char *buf, int length)
 
         if (length % 2 == 0)
         {
-            flash_fd.cur_write_ptr += length;
-            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length, flash_fd.cur_write_ptr);
+            flash_fd.cur_ptr += length;
+            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length, flash_fd.cur_ptr);
         }
         else
         {
-            flash_fd.cur_write_ptr += length - 1;
+            flash_fd.cur_ptr += length - 1;
             flash_fd.temp += buf[length -1];
             flash_fd.temp_flag = 1;
             //DBG_LOG("add data to temp\n");
-            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length - 1, flash_fd.cur_write_ptr);
+            //DBG_LOG("flash_write writed %d bytes to flash, now current write pointer is %08x\n", length - 1, flash_fd.cur_ptr);
         }
 
         return length;
     }
 }
 
+/**
+ * flash change pointer position 
+ *
+ * @param   offset      偏移量
+ *          whence      SEEK_SET    从开始偏移（offset不支持负值）
+ *                      SEEK_CUR    从当前偏移
+ *                      SEEK_END    从结尾偏移（offset不支持正值）
+ *
+ * @return   -1 : error
+ *            0 : ok
+ */
+int flash_lseek(int offset, int whence)
+{
+    switch (whence)
+    {
+        case SEEK_SET:
+            if (offset < 0)
+            {
+                DBG_LOG("you can not set current position before start position!\n");
+                return -1;
+            }
+            else
+            {
+                flash_fd.cur_ptr = (uint32_t)flash_fd.start_addr + offset;
+            }
+            break;
+        case SEEK_CUR:
+            flash_fd.cur_ptr = flash_fd.cur_ptr + offset;
+            break;
+        case SEEK_END:
+            if (offset > 0)
+            {
+                DBG_LOG("you can not set current position after end position!\n");
+                return -1;
+            }
+            else
+            {
+                flash_fd.cur_ptr = (uint32_t)flash_fd.start_addr + flash_fd.size - 1 + offset;
+            }
+            break;
+    }
+    return 0;       
+}
 
 /**
  * flash unlock ,write the remaining data to flash and clear parameter
@@ -351,20 +417,20 @@ int flash_close(void)
 //	}
 	if (flash_fd.temp_flag)
     {
-        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_write_ptr, &flash_fd.temp, 1) == -1)
+        if (flash_write_halfword((volatile unsigned short *)flash_fd.cur_ptr, &flash_fd.temp, 1) == -1)
 		{
 			DBG_LOG("flash write error!\n");
 			return -1;
 		}
-        flash_fd.cur_write_ptr += 1;
+        
         flash_fd.temp = 0;
         flash_fd.temp_flag = 0;
     }
 
     HAL_FLASH_Lock();
 	flash_fd.start_addr = NULL;
-	flash_fd.cur_read_ptr = NULL;
-	flash_fd.cur_write_ptr = NULL;
+	flash_fd.cur_ptr = NULL;
+	
 
 	return 0;
 }

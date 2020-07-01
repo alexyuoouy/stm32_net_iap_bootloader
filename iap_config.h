@@ -32,19 +32,8 @@
 //#define     APP_DOWNLOAD_URL            "http://.../app.bin"
 #define     PARA_DOWNLOAD_URL           "http://.../parameter.txt"
 
+#define     DOWNLOAD_BLOCK_SIZE         1024											
 
-
-
-/*parameter example
-
-size: 23432
-MD5: 03d3fabeec45a70b08845c13db82eb15
-     c645819c0a01b89a965954060d8582e9
-     a72b43ba6f1f06dd875aad3a7ef5b6b6
-     a72b43ba6f1f06dd875aad3a7ef5b6b6
-     03d3fabeec45a70b08845c13db82eb15
-     03d3fabeec45a70b08845c13db82eb15
-*/
 
 
 

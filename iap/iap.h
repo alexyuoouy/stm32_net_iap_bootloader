@@ -38,6 +38,7 @@ struct parameter_item
 typedef void (* App_Reset)( void );
 
 static int download_to_flash( char *url, uint32_t address, int size);
+static int download_to_flash_bpr( char *url, uint32_t address, int size);																		 
 static void MSR_MSP(unsigned int addr);
 static void interrupt_disable(void);
 static int parameter_parser(uint32_t para_addr);

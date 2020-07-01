@@ -11,6 +11,8 @@
 #ifndef __HTTPCLIENT__
 #define __HTTPCLIENT__
 
+#include "iap_config.h"					   
+#include "stm32f1xx.h"
 
 
 #define HTTPCLIENT_URL_MAX_SIZE 						128
@@ -22,6 +24,7 @@
 #define HTTPCLIENT_RECV_BUFFER_SIZE						4096
 #define HTTPCLIENT_RESPONSE_BUFSZ						1024
 #define HTTPCLIENT_CONTENT_TYPE_BUFSZ				    64
+#define HTTPCLIENT_CONTENT_RANGE_BUFSZ				    16												
 
 struct addrinfo {
     int               ai_flags;              /* Input flags. */
@@ -37,18 +40,32 @@ struct addrinfo {
 
 struct HTTPClient_Req_Header
 {
-	char *buffer;                            /* request header buffer */
-    int length;                    		     /* length */
+	char *buffer;
+    int length;                    		/* 长度 */
+    /* 标记已下载区块, 一个bit标记一个块,512k的flash，1024的块大小最多需要64Bytes记录,flash可能不是（DOWNLOAD_BLOCK_SIZE * 8）对齐，向上取整 */
+    unsigned char flag[(FLASH_BANK1_END - FLASH_BASE ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1];             
+    char *content_range;                /* 下载范围 */
+    int break_point_resume;		   
 };
 
 struct HTTPClient_Resp_Header
 {
-    char *buffer;						     /* response header buffer */
+    char *buffer;						/* 缓存 */
+    int length;							/* 长度 */
+    int status;                         /* 状态码 */
+    char *content_type;					/* 内容类型 */
+    int content_length;		    		/* 内容长度 */
+    int content_overall_length;         /* 文件总长 */
+    int content_range_start;            /* 起始字节 */
+    int content_range_end;              /* 终止字节 */
+};
 
-	int status;							     /* request status */
-	int length;							     /* response content length */
-	char *content_type;					     /* response content type */
-	int content_length;				         /* response content length */
+struct Resp_Status_Operation
+{
+    int start_status;
+    int end_status;
+    int (* func)(void);                /* 状态码在某个区间内的采取相同操作 */
+															  
 };
 
 struct HTTPClient
@@ -65,7 +82,7 @@ struct HTTPClient
 	char *ip_addr;						     /* ip address */
 	char *path;						         /* file path */
 	char *req_addr;						     /* request address */
-    unsigned char *data_buffer;                       /* receive data buffer */
+    unsigned char *data_buffer;              /* receive data buffer */
 };
 
 struct Prefix_Struct
@@ -89,9 +106,14 @@ int http_write(const unsigned char *buffer, int length);
 int http_close(void);
 int http_send_reqheader(void);
 int http_recv_respheader(void);
-int http_add_reqheader(char *header);
+int http_make_reqheader(struct HTTPClient * httpcli_t);
 int http_respheader_parse(void);
 int http_print_resp_header2(void);
 static int http_addr_parse(struct addrinfo **res, char *url);
 
+int NoHandle(void);
+int success200(void);
+int success206(void);
+
+struct Resp_Status_Operation *get_resp_status_op(void);									   
 #endif

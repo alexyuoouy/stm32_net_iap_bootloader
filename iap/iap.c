@@ -40,25 +40,18 @@ static struct parameter_item para_item[IAP_PARA_ITEM_NUM] = {
  */
 static int download_to_flash( char *url, uint32_t address, int size)
 {
-    if (address % 2048 != 0)
+    if (address % 2048 != 0 || url == NULL)
     {
-        DBG_LOG("download address must be 2K alined!\n");
+        DBG_LOG("download address is not alined in 2k! or url is null!\n");
         return -1;
     }
 
     if (flash_open((unsigned short *)address, size, Write) != 0)
     {
-        DBG_LOG("flash open error!\n");
+        DBG_LOG("flash open error!\n");			  
         return -1;
     }
-
-    if (url == NULL)
-    {
-        DBG_LOG("please input a url!\n");
-        flash_close();
-        return -1;
-    }
-    else
+	else
     {
         httpclient_init();
         if( http_connect(url) < 0 )
@@ -68,6 +61,8 @@ static int download_to_flash( char *url, uint32_t address, int size)
             http_close();
             return -1;
         }
+		httpclient_t->req_header.break_point_resume = 0;
+        http_make_reqheader(httpclient_t);	  
         if ( http_send_reqheader() < 0 )
         {
             DBG_LOG("download failed, send header failed!\n");
@@ -142,7 +137,135 @@ static int download_to_flash( char *url, uint32_t address, int size)
         return recive;
     }
 }
-
+/**
+ * download remote file to flash use break point 
+ *
+ * @param url               the input server URL address
+ *        address           flash address
+ *        size              no less than file size
+ *
+ * @return  -1 :    error
+ *          >=0:    downloaded file size
+ */
+static int download_to_flash_bpr( char *url, uint32_t address, int size)
+{
+     if (address % 2048 != 0 || url == NULL)
+    {
+        DBG_LOG("download address is not alined in 2k! or url is null!\n");
+        return -1;
+    }
+    while (flash_open((unsigned short *)address, size, Write) != 0);
+    httpclient_init();
+    httpclient_t->req_header.break_point_resume = 1;
+    
+    int i;
+    int receive_length = 0;
+    int err_count = 0;
+    int zone_count = 0;
+    
+__retry:
+    while( http_connect(url) != 0 );
+   
+    DBG_LOG("divided into %d zones\n", (size - 1) / DOWNLOAD_BLOCK_SIZE + 1);
+    for(i = 0; i < (size - 1 ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1; i++)
+    {
+        int num;
+        if (i == (size - 1 ) / (DOWNLOAD_BLOCK_SIZE * 8))
+        {
+            num = ((size - 1) / DOWNLOAD_BLOCK_SIZE + 1) % 8;
+        }
+        else
+        {
+            num = 8;
+        }
+        int j;
+        for(j = 0; j < num; j++)
+        {
+            if((httpclient_t->req_header.flag[i] & ((unsigned char)1 << j)) == 0)
+            {
+                int start = 8 * DOWNLOAD_BLOCK_SIZE * i + DOWNLOAD_BLOCK_SIZE * j;
+                int end;
+                if (j == num -1)
+                {
+                    end = start + size % DOWNLOAD_BLOCK_SIZE - 1;
+                }
+                else
+                {
+                    end = start + DOWNLOAD_BLOCK_SIZE - 1;
+                }
+                
+                sprintf(httpclient_t->req_header.content_range, "%d-%d", start , end);
+                http_make_reqheader(httpclient_t);
+                
+                __resendheader:
+                if ( http_send_reqheader() < 0 )
+                {
+                    err_count++;
+                    DBG_LOG("send header failed!\n");
+                    if (err_count > 3)
+                    {
+                        err_count = 0;
+                        http_close();
+                        goto __retry;
+                    }
+                }
+                if ( http_recv_respheader() < 0 )
+                {
+                    DBG_LOG("revice response header failed!\n");
+                    goto __resendheader;
+                }
+                http_print_resp_header();
+                
+                if ( http_respheader_parse() < 0 )
+                {
+                    DBG_LOG("response header parse failed!\n");
+                    goto __resendheader;
+                }
+                
+                
+                DBG_LOG("current download size : %d bytes, totle size : %d KB\n", httpclient_t->resp_header.content_length , (int)((float)httpclient_t->resp_header.content_overall_length / 1024));
+                DBG_LOG("current download zone %d\n", 8 * i + j);
+                int recive = 0;
+                int length = 0;
+                int write_len = 0;
+                while (recive < httpclient_t->resp_header.content_length)
+                {
+                    length = http_read(httpclient_t->data_buffer, httpclient_t->resp_header.content_length);
+                    if (length < httpclient_t->resp_header.content_length)
+                    {
+                        DBG_LOG("read data error!\n");
+                        goto __resendheader;
+                    }
+                    DBG_LOG("length is :%d\n", length);
+                    recive += length;
+                    __rewrite:
+                    /*flash lseek to undownload area*/
+                    flash_lseek( 8 * DOWNLOAD_BLOCK_SIZE * i + DOWNLOAD_BLOCK_SIZE * j, SEEK_SET);
+                    write_len = flash_write(httpclient_t->data_buffer, DOWNLOAD_BLOCK_SIZE);
+                    if (write_len < DOWNLOAD_BLOCK_SIZE)
+                    {
+                        DBG_LOG("file write error!\n");
+                        goto __rewrite;
+                    }
+                    DBG_LOG("flash wtited %d bytes!\n",write_len);
+                  
+                    DBG_LOG("zone %d download %d\%...\n\n", 8 * i + j, (int)((float)recive / (float )(httpclient_t->resp_header.content_length) * 100));
+                }
+                httpclient_t->req_header.flag[i] |= ((unsigned char)1 << j);
+                zone_count++;
+                receive_length += recive;
+                DBG_LOG("zone %d download successed!\n", 8 * i + j); 
+                DBG_LOG("download zones/total zones: %d/%d\n\n\n\n", zone_count, (size - 1) / DOWNLOAD_BLOCK_SIZE + 1);
+                rt_thread_delay(RT_TICK_PER_SECOND);
+            }/* if not download */
+        }/* for j 1k */  
+    }/* for i 8k */
+    if (zone_count < (size - 1) / DOWNLOAD_BLOCK_SIZE + 1)
+    {
+        goto __retry;
+    }
+    return receive_length;  
+}
 
 static __ASM void MSR_MSP(unsigned int addr)
 {
@@ -176,7 +299,7 @@ int upgrade(void)
     }
 
     /* download application bin file */
-    if (download_to_flash(iap_para.url, iap_para.app_flash_base, iap_para.size) == -1)
+    if (download_to_flash_bpr(iap_para.url, iap_para.app_flash_base, iap_para.size) == -1)
     {
         DBG_LOG("download error!\n");
         return -1;
@@ -273,7 +396,7 @@ static int parameter_parser(uint32_t para_addr)
            }
         }
     }
-
+	DBG_LOG("parameter length is: %d\n", strlen(temp));
     ptr = temp;
     char format[11] = "%*s ";
     for (i = 0; i < IAP_PARA_ITEM_NUM; i++)
@@ -287,7 +410,7 @@ static int parameter_parser(uint32_t para_addr)
         }
         else
         {
-            DBG_LOG("strstr parameter error!\n");
+            DBG_LOG("response parameter error!\n");
             flash_close();
             free(temp);
             return -1;

@@ -1,5 +1,5 @@
 /*
- * On chip flash program
+ * flash read and program
  *
  * Use HAL library
  *
@@ -23,8 +23,9 @@ typedef enum
 
 typedef enum
 {
-    Read = 0U,
-    Write = 1U
+    Read         = 1U,
+    Write        = 2U,
+    ReadAndWrite = 3U	 
 } Open_Flash_Type;
 
 struct Flash_fd
@@ -34,19 +35,21 @@ struct Flash_fd
     //Flash_Type type;                            /*flash type*/
     //int lock;									/*flash lock*/
 
+	int RW_flag;                                /* read, write or read and write */
 	volatile unsigned short *start_addr;		/*start address*/
-    int read_size;                              /* read size */                                                           
-	uint32_t cur_read_ptr;		                /*current read pointer*/
-    
-	uint32_t cur_write_ptr;		                /*current write pointer*/
+    int size;                                   /* read or write size */
+	uint32_t cur_ptr;		                    /*current read or write pointer*/
+	
+																   
     unsigned short temp;                        /*temporary storage*/
-    int temp_flag;                             /*flag is record temp status*/
+    int temp_flag;                              /*flag is record temp status*/
 };
 
 
 int flash_open( volatile unsigned short * start_addr,int size, Open_Flash_Type flag );
 int flash_read( unsigned char *buf, int length );
 int flash_write( unsigned char *buf, int length );
+int flash_lseek(int offset, int whence);										
 int flash_close(void );
 
 
