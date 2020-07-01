@@ -227,7 +227,6 @@ __retry:
                     goto __resendheader;
                 }
 
-
                 DBG_LOG("current download size : %d bytes, totle size : %d KB\n", httpclient_t->resp_header.content_length , (int)((float)httpclient_t->resp_header.content_overall_length / 1024));
                 DBG_LOG("current download zone %d\n", 8 * i + j);
                 int recive = 0;
@@ -269,13 +268,15 @@ __retry:
     {
         goto __retry;
     }
+    flash_close();
+    http_close();
     return receive_length;
 }
 
 static __ASM void MSR_MSP(unsigned int addr)
 {
     MSR     MSP, r0         /* set Main Stack value */
-    BX      r14
+    BX      LR				/* return  */
 }
 
 static __ASM void interrupt_disable(void)
@@ -435,7 +436,7 @@ static int parameter_parser(uint32_t para_addr)
     }
 }
 
-int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_out)
+static int generate_bin_md5(uint32_t addr, struct iap_parameter *iap_para_t, char *md5_out)
 {
     if (addr % 2048 != 0 )
     {
