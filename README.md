@@ -13,9 +13,9 @@
 * ## 主要流程：
 
 1. 首先从http文件服务器下载配置文件，放入iap-parameter中。
-2. 从iap-parameter中读取参数，比如下载地址和大小等参数。（后续再做成消息推送）
-3. 利用iap-parameter的参数从http文件服务器下载application 的bin文件到指定地址。
-4. 将已经烧录进flash的bin文件读出，计算MD5，同iap-parameter中的MD5比对，相同则校验成功。
+2. 从iap-parameter中读取参数，比如下载地址和大小等参数。（后续再做成消息拉取）
+3. 利用iap-parameter的参数从http文件服务器分块下载（断点续传）application 的bin文件到指定地址。
+4. 将已经烧录进flash的bin文件读出，计算MD5，同iap-parameter中的MD5比对，相同则校验成功，不成功重新下载。
 5. 跳转至APP。
 
 * ## iap-parameter文件格式：
@@ -35,6 +35,7 @@ Version: V0.0.1
 
 
 * ## 移植方法：
-1. 底层需要实现socket的POSIX接口，填入socket.h中
+1. 需要实现socket.h中的POSIX接口。
+2. 需将iap_config.h中的DBG_LOG重定向到串口打印。
 * ## 代码引用
 * MD5的计算部分需感谢<https://blog.csdn.net/xhhjin/article/details/8450686>
