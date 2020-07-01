@@ -19,7 +19,8 @@
 
 static struct HTTPClient * httpclient_t;
 static struct iap_parameter iap_para;
-
+/* 标记已下载区块, 一个bit标记一个块,512k的flash，1024的块大小最多需要64Bytes记录,flash可能不是（DOWNLOAD_BLOCK_SIZE * 8）对齐，向上取整 */
+static unsigned char down_zone_flag[(FLASH_BANK1_END - FLASH_BASE ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1];
 static struct parameter_item para_item[IAP_PARA_ITEM_NUM] = {
     {"Url:", "%s", &iap_para.url},
     {"Size:", "%ld", &iap_para.size},
@@ -48,7 +49,7 @@ static int download_to_flash( char *url, uint32_t address, int size)
 
     if (flash_open((unsigned short *)address, size, Write) != 0)
     {
-        DBG_LOG("flash open error!\n");			  
+        DBG_LOG("flash open error!\n");
         return -1;
     }
 	else
@@ -62,7 +63,7 @@ static int download_to_flash( char *url, uint32_t address, int size)
             return -1;
         }
 		httpclient_t->req_header.break_point_resume = 0;
-        http_make_reqheader(httpclient_t);	  
+        http_make_reqheader(httpclient_t);
         if ( http_send_reqheader() < 0 )
         {
             DBG_LOG("download failed, send header failed!\n");
@@ -138,7 +139,7 @@ static int download_to_flash( char *url, uint32_t address, int size)
     }
 }
 /**
- * download remote file to flash use break point 
+ * download remote file to flash use break point
  *
  * @param url               the input server URL address
  *        address           flash address
@@ -157,15 +158,19 @@ static int download_to_flash_bpr( char *url, uint32_t address, int size)
     while (flash_open((unsigned short *)address, size, Write) != 0);
     httpclient_init();
     httpclient_t->req_header.break_point_resume = 1;
-    
     int i;
+    for(i = 0; i < (FLASH_BANK1_END - FLASH_BASE ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1; i++)
+    {
+        down_zone_flag[i] = 0;
+    }
+
     int receive_length = 0;
     int err_count = 0;
     int zone_count = 0;
-    
+
 __retry:
     while( http_connect(url) != 0 );
-   
+
     DBG_LOG("divided into %d zones\n", (size - 1) / DOWNLOAD_BLOCK_SIZE + 1);
     for(i = 0; i < (size - 1 ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1; i++)
     {
@@ -181,7 +186,7 @@ __retry:
         int j;
         for(j = 0; j < num; j++)
         {
-            if((httpclient_t->req_header.flag[i] & ((unsigned char)1 << j)) == 0)
+            if((down_zone_flag[i] & ((unsigned char)1 << j)) == 0)
             {
                 int start = 8 * DOWNLOAD_BLOCK_SIZE * i + DOWNLOAD_BLOCK_SIZE * j;
                 int end;
@@ -193,10 +198,10 @@ __retry:
                 {
                     end = start + DOWNLOAD_BLOCK_SIZE - 1;
                 }
-                
+
                 sprintf(httpclient_t->req_header.content_range, "%d-%d", start , end);
                 http_make_reqheader(httpclient_t);
-                
+
                 __resendheader:
                 if ( http_send_reqheader() < 0 )
                 {
@@ -215,14 +220,14 @@ __retry:
                     goto __resendheader;
                 }
                 http_print_resp_header();
-                
+
                 if ( http_respheader_parse() < 0 )
                 {
                     DBG_LOG("response header parse failed!\n");
                     goto __resendheader;
                 }
-                
-                
+
+
                 DBG_LOG("current download size : %d bytes, totle size : %d KB\n", httpclient_t->resp_header.content_length , (int)((float)httpclient_t->resp_header.content_overall_length / 1024));
                 DBG_LOG("current download zone %d\n", 8 * i + j);
                 int recive = 0;
@@ -248,23 +253,23 @@ __retry:
                         goto __rewrite;
                     }
                     DBG_LOG("flash wtited %d bytes!\n",write_len);
-                  
+
                     DBG_LOG("zone %d download %d\%...\n\n", 8 * i + j, (int)((float)recive / (float )(httpclient_t->resp_header.content_length) * 100));
                 }
-                httpclient_t->req_header.flag[i] |= ((unsigned char)1 << j);
+                down_zone_flag[i] |= ((unsigned char)1 << j);
                 zone_count++;
                 receive_length += recive;
-                DBG_LOG("zone %d download successed!\n", 8 * i + j); 
+                DBG_LOG("zone %d download successed!\n", 8 * i + j);
                 DBG_LOG("download zones/total zones: %d/%d\n\n\n\n", zone_count, (size - 1) / DOWNLOAD_BLOCK_SIZE + 1);
                 rt_thread_delay(RT_TICK_PER_SECOND);
             }/* if not download */
-        }/* for j 1k */  
+        }/* for j 1k */
     }/* for i 8k */
     if (zone_count < (size - 1) / DOWNLOAD_BLOCK_SIZE + 1)
     {
         goto __retry;
     }
-    return receive_length;  
+    return receive_length;
 }
 
 static __ASM void MSR_MSP(unsigned int addr)

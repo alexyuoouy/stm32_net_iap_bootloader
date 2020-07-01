@@ -11,7 +11,7 @@
 #ifndef __HTTPCLIENT__
 #define __HTTPCLIENT__
 
-#include "iap_config.h"					   
+#include "iap_config.h"
 #include "stm32f1xx.h"
 
 
@@ -24,7 +24,7 @@
 #define HTTPCLIENT_RECV_BUFFER_SIZE						4096
 #define HTTPCLIENT_RESPONSE_BUFSZ						1024
 #define HTTPCLIENT_CONTENT_TYPE_BUFSZ				    64
-#define HTTPCLIENT_CONTENT_RANGE_BUFSZ				    16												
+#define HTTPCLIENT_CONTENT_RANGE_BUFSZ				    16
 
 struct addrinfo {
     int               ai_flags;              /* Input flags. */
@@ -42,10 +42,9 @@ struct HTTPClient_Req_Header
 {
 	char *buffer;
     int length;                    		/* 长度 */
-    /* 标记已下载区块, 一个bit标记一个块,512k的flash，1024的块大小最多需要64Bytes记录,flash可能不是（DOWNLOAD_BLOCK_SIZE * 8）对齐，向上取整 */
-    unsigned char flag[(FLASH_BANK1_END - FLASH_BASE ) / (DOWNLOAD_BLOCK_SIZE * 8) + 1];             
+                 
     char *content_range;                /* 下载范围 */
-    int break_point_resume;		   
+    int break_point_resume;
 };
 
 struct HTTPClient_Resp_Header
@@ -65,7 +64,7 @@ struct Resp_Status_Operation
     int start_status;
     int end_status;
     int (* func)(void);                /* 状态码在某个区间内的采取相同操作 */
-															  
+
 };
 
 struct HTTPClient
@@ -115,5 +114,5 @@ int NoHandle(void);
 int success200(void);
 int success206(void);
 
-struct Resp_Status_Operation *get_resp_status_op(void);									   
+struct Resp_Status_Operation *get_resp_status_op(void);
 #endif
